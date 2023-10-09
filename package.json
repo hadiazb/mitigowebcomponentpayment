@@ -12,7 +12,7 @@
   "unpkg": "dist/mitigowebcomponentpayment/mitigowebcomponentpayment.esm.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ionic-team/stencil-component-starter.git"
+    "url": "https://github.com/hadiazb/mitigowebcomponentpayment.git"
   },
   "files": [
     "dist/",
