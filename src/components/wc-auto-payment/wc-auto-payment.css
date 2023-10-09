@@ -1,0 +1,679 @@
+:host {
+  display: block;
+}
+
+.ml-card {
+  margin: 10px;
+  background: rgb(255, 255, 255);
+  border-radius: 2px;
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px;
+  overflow: hidden;
+  font-family: 'robotoregular', sans-serif;
+  padding: 16px;
+}
+
+.ml-card.at-loading .loading {
+  margin: 0 auto;
+}
+
+.at-card-header {
+  color: #00377d;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  margin: 3px 0 12px;
+}
+
+.at-card-title {
+  color: #00377d;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 22px;
+  margin-bottom: 3px;
+  font-family: 'robotomedium', sans-serif;
+}
+
+.at-nodata-box {
+  border: 1px dashed #a9bbd4;
+  padding: 20px;
+}
+
+.at-nodata-title {
+  margin-bottom: 16px !important;
+}
+
+.at-autopay-icon {
+  height: 32px;
+  width: 32px;
+}
+
+.at-card-lable {
+  color: #00377d;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 22px;
+}
+
+.at-card-text {
+  color: #565656;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  word-break: break-word;
+}
+
+.at-note-text, .at-bill-pay-content-description {
+  color: #565656;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.at-bill-pay-content-description {
+  margin-top: 12px;
+}
+
+.at-row {
+  display: block;
+  margin-top: 5px;
+}
+
+.at-col {
+  display: inline-block;
+  width: 50%;
+  vertical-align: top;
+}
+
+.at-single-paymentMethod-header {
+  border-bottom: 1px solid #56565633;
+  margin: 0 -16px 12px;
+  padding: 0 16px 16px;
+}
+
+.at-paymentMethod-item {
+  border-top: 1px solid #56565633;
+  display: flex;
+  align-items: center;
+  margin: 0 -16px;
+  padding: 10px 10px 10px 0;
+  cursor: pointer;
+}
+
+.at-single-paymentMethod-item {
+  border: 0;
+  margin-top: -16px;
+}
+
+.at-pay-icon {
+  width: 24px;
+  height: 24px;
+  margin: 12px;
+}
+
+.at-with-description {
+  display: flex;
+  flex-direction: column;
+  width: calc(100% - 50px);
+  flex: auto;
+  height: fit-content;
+  padding-top: 5px;
+}
+
+.at-without-description {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.at-payment-name {
+  color: #00377d;
+}
+
+.at-set-height {
+  height: 19px;
+}
+
+.at-saldo-card-red {
+  font-size: 12px;
+  color: #d70505;
+}
+
+.at-saldo-card {
+  font-size: 12px;
+  color: #565656;
+}
+.at-payment-list-card {
+  padding-bottom: 0;
+}
+
+.at-account-type-icon {
+  height: 30px;
+  width: 30px;
+}
+
+.at-card-detail-box {
+  margin-top: 16px;
+}
+
+.at-card-detail-box .at-rw {
+  margin-bottom: 5px;
+}
+
+.at-card-icon {
+  vertical-align: bottom;
+}
+
+.at-action-cl {
+  text-align: right;
+}
+
+.at-button-danger {
+  color: red !important;
+}
+
+.at-summary-description {
+  margin-bottom: 12px;
+}
+
+.at-card-number {
+  color: #393a3b;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  flex: auto;
+  align-items: center;
+}
+
+.at-input-label {
+  color: #393a3b;
+  display: table;
+  position: relative;
+  margin: 10px 0 !important;
+  float: right;
+}
+
+.at-pagar-button {
+  display: flex;
+  padding-left: 0px;
+  justify-content: flex-end;
+  align-items: center;
+  align-self: stretch;
+}
+
+.at-pagar-button button {
+  padding: 0 18px;
+  font-size: 0.875rem;
+  line-height: 34px;
+  border: 1px solid transparent;
+  position: relative;
+  background-color: #00c8ff;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  text-transform: uppercase;
+  border-radius: 50px;
+  vertical-align: middle;
+  transition: 0.3s;
+  display: inline-block;
+}
+
+.at-active.at-input-label span {
+  font-size: 12px;
+  transform: translate(12px, -10px) scale(1);
+  background-color: #fff;
+  padding: 0 3px;
+  color: #565656;
+  line-height: 1.14rem;
+  position: absolute;
+  top: 2px;
+}
+
+.at-active.at-input-label.has-danger input, .at-input-label.has-danger input {
+  border-color: #f01e46;
+}
+
+.pristine-error {
+  color: #f01e46;
+  font-size: 12px;
+}
+
+.at-active.at-input-label input {
+  border: 1px solid #787878e6;
+  color: #565656;
+  min-width: 104px;
+  max-width: 104px;
+}
+.at-billing-data-row {
+  border-top: 1px solid rgba(86, 86, 86, 0.2);
+  padding: 25px 16px 0 16px;
+  margin: 16px -16px 0 -16px;
+  display: flex;
+  align-items: center;
+}
+.at-billing-data-title {
+  flex: auto;
+  color: #00377d;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 22px; /* 137.5% */
+}
+.at-billing-data-icon {
+  width: 16px;
+  height: 16px;
+  color: #00c8ff;
+}
+.at-change-billing-data-button {
+  display: flex;
+  padding-left: 0px;
+  justify-content: flex-end;
+  align-items: center;
+}
+.at-change-billing-data-button button {
+  color: #00c8ff;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 22px;
+  text-transform: uppercase;
+  background: #fff;
+  border: 0;
+}
+.at-font-small {
+  font-size: 0.875rem;
+}
+.at-input-textfield,
+.at-input-select,
+.at-input-date,
+.at-input-search,
+.at-textarea,
+.at-input-password {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  -ms-appearance: none;
+  background: transparent;
+  border: 1px solid #565656;
+  border-radius: 4px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  color: #565656;
+  display: block;
+  font-size: 1rem;
+  font-family: 'robotoregular', sans-serif;
+  line-height: 1.8rem;
+  outline: none;
+  min-width: 200px;
+  height: 45px;
+  width: auto;
+  margin: 0;
+}
+
+.at-credit-card-row {
+  display: flex;
+  align-content: center;
+}
+
+.at-radio-button {
+  display: flex;
+  align-items: center;
+  min-height: 60px;
+}
+
+.at-radio-button input[type='radio'] {
+  height: 20px;
+  width: 20px;
+  margin-right: 12px;
+  vertical-align: bottom;
+  color: #00c8ff;
+  opacity: 0;
+}
+
+.at-radio-button input+label {
+  position: relative;
+}
+
+.at-radio-button input+label:before {
+  content: ' ';
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  position: absolute;
+  top: 11px;
+  left: -36px;
+  border-radius: 50%;
+  display: inline-block;
+  transform: scale(0.7);
+  opacity: 1;
+  border: 2px solid #78787880;
+}
+
+.at-radio-button input:checked+label:after {
+  content: ' ';
+  width: 18px;
+  height: 18px;
+  background: #00c8ff;
+  position: absolute;
+  top: 15px;
+  left: -32px;
+  border-radius: 50%;
+  display: inline-block;
+  transform: scale(0.7);
+  opacity: 1;
+}
+
+.at-radio-button input:checked+label:before {
+  border: 2px solid #00c8ff;
+}
+
+.at-card-detail .at-credit-card-icon {
+  width: 32px;
+  height: 20px;
+  margin-right: 8px;
+}
+
+.at-card-detail .at-credit-card-number {
+  font-weight: 700;
+  font-style: normal;
+  font-stretch: normal;
+  line-height: 1.38;
+  letter-spacing: normal;
+  color: #00377d;
+  font-size: 16px;
+}
+.at-credit-card-cvv {
+  margin-left: auto;
+}
+.at-credit-card-expire {
+  word-break: break-word;
+  font-size: 16px;
+  font-weight: 400;
+  font-style: normal;
+  font-stretch: normal;
+  letter-spacing: normal;
+}
+.at-expired-text {
+  color: #ff135c;
+}
+
+.at-non-expired-text {
+  color: #565656;
+}
+
+.at-payment-type-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.at-payment-method {
+  color: #00377d;
+  padding-top: 5px;
+  padding-left: 12px;
+  font-size: 16px;
+}
+
+.at-add-new-card img {
+  height: 54px;
+  width: 54px;
+  margin-left: -8px;
+  vertical-align: bottom;
+}
+
+.at-add-new-card .at-credit-card-number {
+  display: flex;
+  align-items: center;
+  color: #565656;
+  font-weight: normal;
+}
+
+.form-wrapper {
+  margin-top: 10px;
+}
+.at-pay-accepted-card {
+  margin-bottom: 12px !important;
+  font-size: 12px !important;
+  color: #565656 !important;
+}
+.at-pay-accepted-card-icon {
+  width: 20px;
+  height: 14px;
+  margin: 3px;
+  vertical-align: bottom;
+}
+
+.at-terms {
+  color: #565656;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  margin-top: 12px;
+}
+
+.form-wrapper .at-input-label {
+  float: none;
+  position: relative;
+  width: 97%;
+  margin: 10px 0 !important;
+}
+
+.form-wrapper .at-input-textfield {
+  min-width: auto;
+  color: #787878e6;
+  border-width: 2px !important;
+}
+
+.at-button-row {
+  display: flex;
+  justify-content: end;
+  margin-top: 16px;
+}
+
+.at-input-label span {
+  position: absolute;
+  color: #565656;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  top: -8px;
+  left: 12px;
+  background: #fff;
+  padding: 0 5px;
+}
+
+.form-wrapper .at-input-select {
+  border: 2px solid #9d9fa1;
+  min-height: 45px;
+  min-width: 95%;
+}
+
+.form-wrapper .at-selectlabel {
+  position: relative;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.at-selectlabel span {
+  top: -8px;
+  left: 12px;
+  background: #fff;
+  padding: 0 5px;
+  position: absolute;
+  font-size: 12px;
+}
+
+.form-wrapper .card-number, .form-wrapper .card-numbe.genric {
+  background: url('assets/imgs/card_number_icon.svg') no-repeat left center;
+  background-size: 30px 20px;
+  background-position: 10px center;
+  padding-left: 46px;
+}
+
+.form-wrapper .expiry {
+  background: url('assets/imgs/expiry_icon.svg') no-repeat left center;
+  background-size: 30px 20px;
+  background-position: 95% center;
+}
+
+.form-wrapper .cvv {
+  background: url('assets/imgs/cvv_icon.svg') no-repeat left center;
+  background-size: 30px 20px;
+  background-position: 95% center;
+  width: 96%;
+}
+
+.form-wrapper .card-number.visa:not(.cardIconResetCls) {
+  background: url('assets/credit-card-icons/visa.svg') no-repeat left center;
+  background-size: 30px 20px;
+  background-position: 10px center;
+}
+
+.form-wrapper .card-number.mastercard:not(.cardIconResetCls) {
+  background: url('assets/credit-card-icons/mastercard.svg') no-repeat left center;
+  background-size: 30px 20px;
+  background-position: 10px center;
+}
+
+.form-wrapper .card-number.amex:not(.cardIconResetCls) {
+  background: url('assets/credit-card-icons/amex.svg') no-repeat left center;
+  background-size: 30px 20px;
+  background-position: 10px center;
+}
+
+.form-wrapper .card-number.dinersclub:not(.cardIconResetCls) {
+  background: url('assets/credit-card-icons/dinersclub.svg') no-repeat left center;
+  background-size: 30px 20px;
+  background-position: 10px center;
+}
+
+.at-edit-detail {
+  margin-top: 10px;
+}
+.at-edit-detail .at-cl {
+  align-self: baseline;
+}
+
+.at-edit-detail div + div {
+  text-align: end;
+}
+
+.at-order-status {
+  margin: 0;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.at-order-status-header {
+  background-color: #06367a;
+  color: #fff;
+  min-height: 320px;
+  padding: 24px 0;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+}
+
+.at-checkbox-row {
+  margin: 6px 0 12px;
+}
+
+.at-order-status-icon {
+  height: 45px;
+  width: 45px;
+  margin-bottom: 16px;
+}
+
+.at-text-primary {
+  font-size: 24px;
+  font-weight: 400;
+}
+.at-text-normal {
+  color: #fff;
+  font-weight: 400;
+  text-align: center;
+  font-size: 16px;
+  margin-top: 8px;
+}
+.at-status-btn {
+  margin-top: 24px;
+}
+.at-detail-btn {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.at-detail-btn button,
+.at-detail-btn button:hover,
+.at-detail-btn button:focus {
+  border: 0;
+}
+.at-detail-title {
+  color: #06367a;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 22px;
+  font-family: 'robotomedium', sans-serif;
+  text-align: center;
+}
+.at-order-status-footer {
+  padding: 0 24px 24px;
+}
+
+.ic-expandir-mas-less {
+  display: block;
+  transform: rotate(180deg);
+}
+
+.ml-popup .popup-content {
+  width: 94%;
+}
+
+.at-content-popup-header {
+  background: #178AFD;
+  margin: -24px -24px 24px -24px;
+  padding: 24px;
+}
+
+.at-content-popup-title {
+  display: flex;
+  align-items: center;
+}
+
+.at-auto-packs-icon {
+  width: 62px;
+  height: 34px;
+}
+
+.at-content-popup-title h5 {
+  color: #FFF;
+  font-family: 'robotomedium', sans-serif;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  margin: 0;
+  padding-right: 16px;
+}
+
+.at-content-popup-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.at-account-edit-icon, .at-account-delete-icon {
+  cursor: pointer;
+}

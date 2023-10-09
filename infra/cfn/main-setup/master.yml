@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: v1.0.0 | Caas Frontend  | master | Master Cloudformation Template
+Parameters:
+  CostCenter:
+    Description: Cost Center
+    Type: String
+  Environment:
+    Description: 'Env type: Dev, QA, Prod, etc.'
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - uat
+      - prod
+  StackURL:
+    Description: Source URL+Stack Version WITHOUT trailing /
+    Type: String
+  LambdaS3Bucket:
+    Description: LambdaS3Bucket
+    Type: String
+  Runtime:
+    Description: Runtime for the lambda function
+    Type: String
+    Default: nodejs16.x
+    AllowedValues:
+      - nodejs16.x
+      - nodejs8.10
+      - python3.7
+      - java8
+
+Mappings:
+  EnvData:
+    dev:
+      CloudFrontPriceClass: PriceClass_100
+    qa:
+      CloudFrontPriceClass: PriceClass_100
+    uat:
+      CloudFrontPriceClass: PriceClass_100
+    prod:
+      CloudFrontPriceClass: PriceClass_100
+
+Conditions:
+  ConditionCreateAlarm: !Or [ !Equals ["prod", !Ref Environment], !Equals ["qa", !Ref Environment] ]
+Resources:
+# Caas Frontend IAM stack
+  caasFrontendIAMStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${StackURL}/sub-iam.yml'
+      Parameters:
+        CostCenter: !Ref CostCenter
+        Environment: !Ref Environment
+        StackURL: !Ref StackURL
+        KmsKeyId: !GetAtt caasFrontendKmsStack.Outputs.caasFrontendKmsKeyId
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub ${CostCenter}-${Environment}-IAMStack
+# Caas Frontend Lambda stack
+  caasFrontendLambdaEdge:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${StackURL}/sub-lambda.yml'
+      Parameters:
+        Environment: !Ref Environment
+        CostCenter: !Ref CostCenter
+        caasFrontendLambdaEdgeRole: !GetAtt caasFrontendIAMStack.Outputs.caasFrontendLambdaEdgeRoleArn
+        caasSandboxLambdaEdgeRole: !GetAtt caasFrontendIAMStack.Outputs.caasSandboxLambdaEdgeRoleArn
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub ${CostCenter}-${Environment}-Lambdaedge
+# Caas Frontend KMS Stack
+  caasFrontendKmsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${StackURL}/sub-kms.yml'
+      Parameters:
+        Environment: !Ref Environment
+        CostCenter: !Ref CostCenter
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub ${CostCenter}-${Environment}-KmsStack
+#S3 Stack
+  caasFrontendS3Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${StackURL}/sub-s3.yml'
+      Parameters:
+        Environment: !Ref Environment
+        CostCenter: !Ref CostCenter
+        PriceClass: !FindInMap [EnvData, !Ref Environment, CloudFrontPriceClass ]
+        caasFrontendLambdaEdgeRole: !GetAtt caasFrontendIAMStack.Outputs.caasFrontendLambdaEdgeRoleArn
+        caasFrontendLambdaEdge: !GetAtt caasFrontendLambdaEdge.Outputs.caasFrontendVersionedLambdaEdgeFunction
+        CaasFrontendCRRSourceS3RoleArn: !GetAtt caasFrontendIAMStack.Outputs.caasFrontendCRRSourceS3RoleArn
+        caasSandboxLambdaEdge: !GetAtt caasFrontendLambdaEdge.Outputs.caasSandboxVersionedLambdaEdgeFunction
+        CaasSandboxCRRSourceS3RoleArn: !GetAtt caasFrontendIAMStack.Outputs.caasSandboxCRRSourceS3RoleArn
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub ${CostCenter}-${Environment}-S3Stack
+

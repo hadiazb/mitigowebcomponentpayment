@@ -1,0 +1,2718 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: v1.0.0 | Caas-Frontend | sub-S3 | Parameterized S3 bucket
+Parameters:
+  Environment:
+    Description: 'Enrvironment type: Dev, QA, Prod, etc'
+    Type: String
+    Default: dev
+  CostCenter:
+    Description: Cost Center
+    Type: String
+  PriceClass:
+    Description: Cloudfront Price Class
+    Type: String
+    Default: PriceClass_100
+  caasFrontendLambdaEdgeRole:
+    Description: ARN of LambdaEdgeRole
+    Type: String
+  caasFrontendLambdaEdge:
+    Description: ARN of LambdaEdge
+    Type: String
+  Compress:
+    Description:    CloudFront Origin Protocol Policy to apply to your origin.
+    Type:           String
+    Default:        true
+    AllowedValues:
+      - true
+      - false
+  CaasFrontendCRRSourceS3RoleArn:
+    Description: ARN of the CRRSourceS3Role
+    Type: String
+  CaasSandboxCRRSourceS3RoleArn:
+    Description: ARN of the CRRSourceS3Role
+    Type: String
+  caasSandboxLambdaEdge:
+    Description: ARN of LambdaEdge
+    Type: String
+  SSLCertificateARN:
+    Description: ARN of certificate
+    Type: String
+    Default: arn:aws:acm:us-east-1:245171893372:certificate/69c0b12b-c6f6-4517-ba4a-a84c33ab8b71
+
+Mappings:
+  EnvData:
+    dev:
+      NICDNAlias: caas-dev-ni.tigocloud.net
+      GTCDNAlias: caas-dev-gt.tigocloud.net
+      COCDNAlias: caas-dev-co.tigocloud.net
+      PACDNAlias: caas-dev-pa.tigocloud.net
+      SVCDNAlias: caas-dev-sv.tigocloud.net
+      BOCDNAlias: caas-dev-bo.tigocloud.net
+      HNCDNAlias: caas-dev-hn.tigocloud.net
+      PYCDNAlias: caas-dev-py.tigocloud.net
+      CRCDNAlias: caas-dev-cr.tigocloud.net
+      USCDNAlias: caas-dev-us.tigocloud.net
+      KMSKeyCRRId: arn:aws:kms:us-west-1:245171893372:key/f4eff867-3304-4f17-ad91-881d91e2f487
+      SandboxCDNAlias: caas-sandbox-dev.tigocloud.net
+
+    qa:
+      NICDNAlias: caas-stg-ni.tigocloud.net
+      GTCDNAlias: caas-stg-gt.tigocloud.net
+      COCDNAlias: caas-stg-co.tigocloud.net
+      PACDNAlias: caas-stg-pa.tigocloud.net
+      SVCDNAlias: caas-stg-sv.tigocloud.net
+      BOCDNAlias: caas-stg-bo.tigocloud.net
+      HNCDNAlias: caas-stg-hn.tigocloud.net
+      PYCDNAlias: caas-stg-py.tigocloud.net
+      CRCDNAlias: caas-stg-cr.tigocloud.net
+      USCDNAlias: caas-stg-us.tigocloud.net
+      KMSKeyCRRId: arn:aws:kms:us-west-1:245171893372:key/9da47ff5-9f76-4ca0-b1e7-29e3658c7e21
+      SandboxCDNAlias: caas-sandbox-qa.tigocloud.net
+
+    uat:
+      NICDNAlias: caas-uat-ni.tigocloud.net
+      GTCDNAlias: caas-uat-gt.tigocloud.net
+      COCDNAlias: caas-uat-co.tigocloud.net
+      PACDNAlias: caas-uat-pa.tigocloud.net
+      SVCDNAlias: caas-uat-sv.tigocloud.net
+      BOCDNAlias: caas-uat-bo.tigocloud.net
+      HNCDNAlias: caas-uat-hn.tigocloud.net
+      PYCDNAlias: caas-uat-py.tigocloud.net
+      CRCDNAlias: caas-uat-cr.tigocloud.net
+      USCDNAlias: caas-uat-us.tigocloud.net
+      KMSKeyCRRId: arn:aws:kms:us-west-1:245171893372:key/4376079d-9331-45e8-a088-4dca60e1a6da
+      SandboxCDNAlias: caas-sandbox-uat.tigocloud.net
+          
+Resources:
+  CaasFrontendNICloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend NI Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketNI:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-ni-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-ni-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendNIBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-ni-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-ni-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendNICloudFrontOriginAccessControl
+    - CaasFrontendWebsiteNILoggingBucket
+  CaasFrontendWebsiteNILoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-ni-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-ni-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsiteNILoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsiteNILoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-ni-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-ni-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketNIPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-ni-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-ni-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendNIcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendNIcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-ni-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-ni-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendNICloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketNI
+    - CaasFrontendNIcfDistribution
+  CaasFrontendNIcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-ni-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendNIWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendNICloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-ni-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendNIWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendNICloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-ni-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-ni-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, NICDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendNIWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-ni-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendNIWebOriginS3
+                    - OriginId: CaasFrontendNIWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-NI'
+    DependsOn:
+    - CaasFrontendNICloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketNI
+    - CaasFrontendWebsiteNILoggingBucket
+
+  CaasFrontendGTCloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend GT Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketGT:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-gt-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-gt-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendGTBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-gt-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-gt-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendGTCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteGTLoggingBucket
+  CaasFrontendWebsiteGTLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-gt-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-gt-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsiteGTLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsiteGTLoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-gt-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-gt-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketGTPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-gt-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-gt-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendGTcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendGTcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-gt-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-gt-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendGTCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketGT
+    - CaasFrontendGTcfDistribution
+  CaasFrontendGTcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-gt-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendGTWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendGTCloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-gt-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendGTWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendGTCloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-gt-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-gt-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, GTCDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendGTWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-gt-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendGTWebOriginS3
+                    - OriginId: CaasFrontendGTWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-GT'
+    DependsOn:
+    - CaasFrontendGTCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketGT
+    - CaasFrontendWebsiteGTLoggingBucket
+
+  CaasFrontendCOCloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend CO Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketCO:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-co-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-co-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendCOBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-co-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-co-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendCOCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteCOLoggingBucket
+  CaasFrontendWebsiteCOLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-co-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-co-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsiteCOLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsiteCOLoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-co-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-co-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketCOPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-co-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-co-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendCOcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendCOcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-co-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-co-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendCOCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketCO
+    - CaasFrontendCOcfDistribution
+  CaasFrontendCOcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-co-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendCOWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendCOCloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-co-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendCOWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendCOCloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-co-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-co-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, COCDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendCOWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-co-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendCOWebOriginS3
+                    - OriginId: CaasFrontendCOWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-CO'
+    DependsOn:
+    - CaasFrontendCOCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketCO
+    - CaasFrontendWebsiteCOLoggingBucket
+
+  CaasFrontendBOCloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend BO Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketBO:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-bo-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-bo-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendBOBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-bo-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-bo-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendBOCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBOLoggingBucket
+  CaasFrontendWebsiteBOLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-bo-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-bo-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsiteBOLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsiteBOLoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-bo-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-bo-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketBOPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-bo-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-bo-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendBOcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendBOcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-bo-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-bo-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendBOCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketBO
+    - CaasFrontendBOcfDistribution
+  CaasFrontendBOcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-bo-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendBOWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendBOCloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-bo-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendBOWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendBOCloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-bo-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-bo-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, BOCDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendBOWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-bo-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendBOWebOriginS3
+                    - OriginId: CaasFrontendBOWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-BO'
+    DependsOn:
+    - CaasFrontendBOCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketBO
+    - CaasFrontendWebsiteBOLoggingBucket
+
+  CaasFrontendPACloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend PA Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketPA:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-pa-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-pa-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendPABucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-pa-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-pa-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendPACloudFrontOriginAccessControl
+    - CaasFrontendWebsitePALoggingBucket
+  CaasFrontendWebsitePALoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-pa-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-pa-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsitePALoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsitePALoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-pa-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-pa-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketPAPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-pa-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-pa-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendPAcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendPAcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-pa-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-pa-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendPACloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketPA
+    - CaasFrontendPAcfDistribution
+  CaasFrontendPAcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-pa-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendPAWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendPACloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-pa-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendPAWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendPACloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-pa-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-pa-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, PACDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendPAWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-pa-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendPAWebOriginS3
+                    - OriginId: CaasFrontendPAWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-PA'
+    DependsOn:
+    - CaasFrontendPACloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketPA
+    - CaasFrontendWebsitePALoggingBucket
+
+  CaasFrontendPYCloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend PY Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketPY:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-py-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-py-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendPYBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-py-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-py-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendPYCloudFrontOriginAccessControl
+    - CaasFrontendWebsitePYLoggingBucket
+  CaasFrontendWebsitePYLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-py-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-py-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsitePYLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsitePYLoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-py-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-py-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketPYPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-py-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-py-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendPYcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendPYcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-py-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-py-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendPYCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketPY
+    - CaasFrontendPYcfDistribution
+  CaasFrontendPYcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-py-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendPYWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendPYCloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-py-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendPYWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendPYCloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-py-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-py-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, PYCDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendPYWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-py-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendPYWebOriginS3
+                    - OriginId: CaasFrontendPYWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-PY'
+    DependsOn:
+    - CaasFrontendPYCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketPY
+    - CaasFrontendWebsitePYLoggingBucket
+
+  CaasFrontendCRCloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend CR Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketCR:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-cr-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-cr-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendCRBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-cr-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-cr-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendCRCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteCRLoggingBucket
+  CaasFrontendWebsiteCRLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-cr-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-cr-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsiteCRLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsiteCRLoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-cr-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-cr-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketCRPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-cr-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-cr-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendCRcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendCRcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-cr-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-cr-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendCRCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketCR
+    - CaasFrontendCRcfDistribution
+  CaasFrontendCRcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-cr-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendCRWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendCRCloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-cr-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendCRWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendCRCloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-cr-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-cr-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, CRCDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendCRWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-cr-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendCRWebOriginS3
+                    - OriginId: CaasFrontendCRWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-CR'
+    DependsOn:
+    - CaasFrontendCRCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketCR
+    - CaasFrontendWebsiteCRLoggingBucket
+
+  CaasFrontendHNCloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend HN Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketHN:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-hn-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-hn-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendHNBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-hn-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-hn-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendHNCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteHNLoggingBucket
+  CaasFrontendWebsiteHNLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-hn-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-hn-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsiteHNLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsiteHNLoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-hn-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-hn-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketHNPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-hn-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-hn-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendHNcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendHNcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-hn-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-hn-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendHNCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketHN
+    - CaasFrontendHNcfDistribution
+  CaasFrontendHNcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-hn-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendHNWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendHNCloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-hn-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendHNWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendHNCloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-hn-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-hn-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, HNCDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendHNWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-hn-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendHNWebOriginS3
+                    - OriginId: CaasFrontendHNWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-HN'
+    DependsOn:
+    - CaasFrontendHNCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketHN
+    - CaasFrontendWebsiteHNLoggingBucket
+
+  CaasFrontendUSCloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend US Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketUS:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-us-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-us-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendUSBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-us-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-us-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendUSCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteUSLoggingBucket
+  CaasFrontendWebsiteUSLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-us-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-us-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsiteUSLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsiteUSLoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-us-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-us-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketUSPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-us-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-us-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendUScfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendUScfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-us-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-us-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendUSCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketUS
+    - CaasFrontendUScfDistribution
+  CaasFrontendUScfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-us-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendUSWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendUSCloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-us-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendUSWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendUSCloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-us-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-us-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, USCDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendUSWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-us-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendUSWebOriginS3
+                    - OriginId: CaasFrontendUSWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-NI'
+    DependsOn:
+    - CaasFrontendUSCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketUS
+    - CaasFrontendWebsiteUSLoggingBucket
+
+  CaasFrontendSVCloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Frontend SV Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasFrontendWebsiteBucketSV:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-sv-frontend-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-sv-frontend-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasFrontendCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasFrontendSVBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-sv-frontend-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-sv-frontend-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasFrontendSVCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteSVLoggingBucket
+  CaasFrontendWebsiteSVLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-sv-frontend-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-sv-frontend-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasFrontendWebsiteSVLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasFrontendWebsiteSVLoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-sv-frontend-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-sv-frontend-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasFrontendWebsiteBucketSVPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-sv-frontend-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-sv-frontend-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendSVcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasFrontendSVcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-sv-frontend-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-sv-frontend-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasFrontendSVCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketSV
+    - CaasFrontendSVcfDistribution
+  CaasFrontendSVcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-sv-frontend-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendSVWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendSVCloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-sv-frontend-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasFrontendSVWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasFrontendSVCloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-sv-frontend-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-sv-frontend-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, SVCDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasFrontendSVWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasFrontendLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-sv-frontend-bucket-${Environment}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasFrontendSVWebOriginS3
+                    - OriginId: CaasFrontendSVWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'Caas-Frontend-${Environment}-CfDistribution-SV'
+    DependsOn:
+    - CaasFrontendSVCloudFrontOriginAccessControl
+    - CaasFrontendWebsiteBucketSV
+    - CaasFrontendWebsiteSVLoggingBucket
+
+#Sandbox
+  CaasSandboxCloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Sub 'Sandbox Origin Access Control ${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CaasSandboxWebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-oneapp-sandbox-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-oneapp-sandbox-bucket-${Environment}'
+      VersioningConfiguration :
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref CaasSandboxCRRSourceS3RoleArn
+        Rules:
+          - Id: CaasSandboxBucketCRRRule
+            Status: Enabled
+            Prefix: ""
+            Destination:
+              Bucket: !Sub 'arn:aws:s3:::caas-oneapp-sandbox-crr-bucket-${Environment}'
+              StorageClass: STANDARD
+              EncryptionConfiguration:
+                ReplicaKmsKeyID: !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+            SourceSelectionCriteria:
+              SseKmsEncryptedObjects:
+                Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      LoggingConfiguration:
+        DestinationBucketName: !Sub 'caas-oneapp-sandbox-logging-bucket-${Environment}'
+        LogFilePrefix: !Join ['', [ !Ref Environment, '/']]
+    DependsOn:
+    - CaasSandboxCloudFrontOriginAccessControl
+    - CaasSandboxWebsiteLoggingBucket
+  CaasSandboxWebsiteLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName : !Sub 'caas-oneapp-sandbox-logging-bucket-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls : TRUE
+        BlockPublicPolicy : TRUE
+        IgnorePublicAcls : TRUE
+        RestrictPublicBuckets : TRUE
+      AccessControl: LogDeliveryWrite
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-oneapp-sandbox-logging-bucket-${Environment}'
+      LifecycleConfiguration:
+        Rules:
+        - Id: backup-lifecycle
+          Prefix: ''
+          Status: 'Enabled'
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+      VersioningConfiguration :
+        Status: Enabled
+  CaasSandboxWebsiteLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CaasSandboxWebsiteLoggingBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:*'
+            Effect: "Deny"
+            Resource:
+             - !Sub arn:aws:s3:::caas-oneapp-sandbox-logging-bucket-${Environment}
+             - !Sub arn:aws:s3:::caas-oneapp-sandbox-logging-bucket-${Environment}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Principal: "*"
+  CaasSandboxWebsiteBucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Sub 'caas-oneapp-sandbox-bucket-${Environment}'
+      PolicyDocument:
+        Id: "PolicyForOriginAccessIdentity"
+        Version: '2012-10-17'
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to get S3 Content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    !Sub 'caas-oneapp-sandbox-bucket-${Environment}'
+                  - "/*"
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasSandboxcfDistribution}
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CaasSandboxcfDistribution}
+          - Sid: "AWSS3ForceSSL"
+            Effect: "Deny"
+            Principal: "*"
+            Action:
+              - "s3:*"
+            Resource:
+              - !Sub arn:aws:s3:::caas-oneapp-sandbox-bucket-${Environment}
+              - !Sub arn:aws:s3:::caas-oneapp-sandbox-bucket-${Environment}/*
+            Condition:
+                Bool:
+                  aws:SecureTransport: 'false'
+    DependsOn:
+    - CaasSandboxCloudFrontOriginAccessControl
+    - CaasSandboxWebsiteBucket
+    - CaasSandboxcfDistribution
+  CaasSandboxcfDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        Origins:
+        - DomainName: !Sub 'caas-oneapp-sandbox-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasSandboxWebOriginS3
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasSandboxCloudFrontOriginAccessControl.Id
+        - DomainName: !Sub 'caas-oneapp-sandbox-crr-bucket-${Environment}.s3.amazonaws.com'
+          Id: CaasSandboxWebOriginS3CRR
+          S3OriginConfig:
+            OriginAccessIdentity: ''
+          OriginAccessControlId: !GetAtt CaasSandboxCloudFrontOriginAccessControl.Id
+        Enabled: 'true'
+        DefaultRootObject: index.html
+        Logging:
+          IncludeCookies: 'false'
+          Bucket: !Sub 'caas-oneapp-sandbox-logging-bucket-${Environment}.s3.amazonaws.com'
+          Prefix: !Sub 'caas-oneapp-sandbox-bucket-${Environment}-'
+        Aliases:
+          - !FindInMap [EnvData, !Ref Environment, SandboxCDNAlias ]
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          Compress: !Ref 'Compress'
+          TargetOriginId: CaasSandboxWebOriginS3
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+          - EventType: 'origin-response'
+            LambdaFunctionARN: !Ref caasSandboxLambdaEdge
+        PriceClass: !Ref PriceClass
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref SSLCertificateARN
+          SslSupportMethod : sni-only
+          MinimumProtocolVersion : TLSv1.2_2021
+        OriginGroups:
+            Items: 
+              - Id: !Sub 'caas-oneapp-sandbox-bucket-${Environment}}-OG'
+                FailoverCriteria:
+                  StatusCodes:
+                    Items: 
+                      - 403
+                      - 404
+                      - 500
+                      - 502
+                      - 503
+                      - 504
+                    Quantity: 6
+                Members: 
+                  Items: 
+                    - OriginId: CaasSandboxWebOriginS3
+                    - OriginId: CaasSandboxWebOriginS3CRR
+                  Quantity: 2
+            Quantity: 1
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-oneapp-sandbox-bucket-${Environment}-CfDistribution'
+    DependsOn:
+    - CaasSandboxCloudFrontOriginAccessControl
+    - CaasSandboxWebsiteBucket
+    - CaasSandboxWebsiteLoggingBucket
+
+
+ 

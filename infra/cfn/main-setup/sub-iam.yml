@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: v1.0.0 | Caas Frontend | IAM Stack | Parameterized lambda function in a vpc
+Parameters:
+  CostCenter:
+    Description: Cost Center
+    Type: String
+  Environment:
+    Description: Environment
+    Type: String
+  StackURL:
+    Description: Source URL+Stack Version without trailing /
+    Type: String
+  KmsKeyId:
+    Description: The ID of the KMS Key
+    Type: String
+    Default: ""
+Mappings:
+  EnvData:
+    dev:
+      KMSKeyCRRId: arn:aws:kms:us-west-1:245171893372:key/f4eff867-3304-4f17-ad91-881d91e2f487
+    qa:
+      KMSKeyCRRId: arn:aws:kms:us-west-1:245171893372:key/9da47ff5-9f76-4ca0-b1e7-29e3658c7e21
+    uat:
+      KMSKeyCRRId: arn:aws:kms:us-west-1:245171893372:key/4376079d-9331-45e8-a088-4dca60e1a6da
+
+Resources:
+# Lambda Edge Role
+  caasFrontendLambdaEdgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            - edgelambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  CaasFrontendCRRSourceS3Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'caas-Frontend-CRRS3Role-${Environment}'
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service:
+                - s3.amazonaws.com
+
+  # IAM Role for S3 replication
+  caasFrontendIAMCRRPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: Caas-Frontend-S3IAMCRRPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetReplicationConfiguration
+              - s3:GetObjectVersionForReplication
+              - s3:GetObjectVersionAcl
+              - s3:GetObjectVersionTagging
+              - s3:GetObjectRetention
+              - s3:GetObjectLegalHold
+              - s3:PutBucketReplication
+            Resource: arn:aws:s3:::*
+          - Effect: Allow
+            Action:
+              - s3:ReplicateObject
+              - s3:ReplicateDelete
+              - s3:ReplicateTags
+              - s3:GetObjectVersionTagging
+              - s3:ObjectOwnerOverrideToBucketOwner
+              - s3:GetObjectVersionForReplication
+              - s3:PutBucketReplication
+            Resource: arn:aws:s3:::*
+          - Effect: Allow
+            Action:
+              - kms:Encrypt*
+              - kms:Decrypt*
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:Describe*
+            Resource:
+              - !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/${KmsKeyId}'
+              - !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+      Roles:
+      - Ref: CaasFrontendCRRSourceS3Role
+#Sandbox lambda role
+
+  CaasSandboxLambdaEdgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            - edgelambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  CaasSandboxCRRSourceS3Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'caas-sandbox-CRRS3Role-${Environment}'
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service:
+                - s3.amazonaws.com
+
+  # IAM Role for S3 replication
+  CaasSandboxIAMCRRPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: Caas-Sandbox-S3IAMCRRPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetReplicationConfiguration
+              - s3:GetObjectVersionForReplication
+              - s3:GetObjectVersionAcl
+              - s3:GetObjectVersionTagging
+              - s3:GetObjectRetention
+              - s3:GetObjectLegalHold
+              - s3:PutBucketReplication
+            Resource: arn:aws:s3:::*
+          - Effect: Allow
+            Action:
+              - s3:ReplicateObject
+              - s3:ReplicateDelete
+              - s3:ReplicateTags
+              - s3:GetObjectVersionTagging
+              - s3:ObjectOwnerOverrideToBucketOwner
+              - s3:GetObjectVersionForReplication
+              - s3:PutBucketReplication
+            Resource: arn:aws:s3:::*
+          - Effect: Allow
+            Action:
+              - kms:Encrypt*
+              - kms:Decrypt*
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:Describe*
+            Resource:
+              - !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/${KmsKeyId}'
+              - !FindInMap [EnvData, !Ref Environment, KMSKeyCRRId ]
+      Roles:
+      - Ref: CaasSandboxCRRSourceS3Role
+Outputs:
+  caasFrontendLambdaEdgeRoleArn:
+    Description: ARN of the  Lambda Role
+    Value: !GetAtt caasFrontendLambdaEdgeRole.Arn
+  caasFrontendCRRSourceS3RoleArn:
+    Description: ARN of the CRR Source S3 Role
+    Value: !GetAtt CaasFrontendCRRSourceS3Role.Arn
+#Sandbox
+  caasSandboxLambdaEdgeRoleArn:
+    Description: ARN of the  Lambda Role
+    Value: !GetAtt CaasSandboxLambdaEdgeRole.Arn
+  caasSandboxCRRSourceS3RoleArn:
+    Description: ARN of the CRR Source S3 Role
+    Value: !GetAtt CaasSandboxCRRSourceS3Role.Arn

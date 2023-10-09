@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: v1.0.0 | Millicom CaaS | Lambda Stack | Lambda Cloudformation template
+Parameters:
+  Environment:
+    Description: 'Env type: Dev, QA, Prod, etc.'
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - uat
+      - prod
+  CostCenter:
+    Description: Cost Center
+    Type: String
+  caasFrontendLambdaEdgeRole:
+    Description: ARN of LambdaEdgeRole
+    Type: String
+  caasSandboxLambdaEdgeRole:
+    Description: ARN of LambdaEdgeRole
+    Type: String
+
+Resources:
+  caasFrontendLambdaEdgeFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: !Sub |
+          'use strict';
+          exports.handler = (event, context, callback) => {
+            const response = event.Records[0].cf.response;
+            const headers = response.headers;
+            headers['x-frame-options'] = [
+              { key: 'X-Frame-Options', value: 'deny' }
+            ];
+            return callback(null, response);
+          };
+      Handler: 'index.handler'
+      Description: !Sub '${Environment} function LambdaEdge for Caas Frontend'
+      FunctionName: !Sub 'Caas-Frontend-LambdaEdge-${Environment}'
+      MemorySize: 128
+      Role: !Ref caasFrontendLambdaEdgeRole
+      Runtime: 'nodejs16.x'
+      Timeout: 5
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-Frontend-${Environment}-LambdaEdge'
+  caasFrontendVersionedLambdaEdgeFunction:
+    Type: 'AWS::Lambda::Version'
+    Properties:
+      FunctionName: !Ref caasFrontendLambdaEdgeFunction
+    DependsOn:
+    - caasFrontendLambdaEdgeFunction
+
+  caasSandboxLambdaEdgeFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: !Sub |
+          'use strict';
+          exports.handler = (event, context, callback) => {
+            const response = event.Records[0].cf.response;
+            const headers = response.headers;
+            headers['x-frame-options'] = [
+              { key: 'X-Frame-Options', value: 'deny' }
+            ];
+            return callback(null, response);
+          };
+      Handler: 'index.handler'
+      Description: !Sub '${Environment} function LambdaEdge for Caas Sandbox'
+      FunctionName: !Sub 'Caas-Sandbox-LambdaEdge-${Environment}'
+      MemorySize: 128
+      Role: !Ref caasSandboxLambdaEdgeRole
+      Runtime: 'nodejs16.x'
+      Timeout: 5
+      Tags:
+      - Key: Cost Center
+        Value: !Ref CostCenter
+      - Key: Stack
+        Value: !Ref Environment
+      - Key: Name
+        Value: !Sub 'caas-Sandbox-${Environment}-LambdaEdge'
+  caasSandboxVersionedLambdaEdgeFunction:
+    Type: 'AWS::Lambda::Version'
+    Properties:
+      FunctionName: !Ref caasSandboxLambdaEdgeFunction
+    DependsOn:
+    - caasSandboxLambdaEdgeFunction
+
+Outputs:
+  caasFrontendLambdaEdgeFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt caasFrontendLambdaEdgeFunction.Arn
+  caasFrontendVersionedLambdaEdgeFunction:
+    Description: ARN of the Lambda function
+    Value: !Ref caasFrontendVersionedLambdaEdgeFunction
+
+  caasSandboxLambdaEdgeFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt caasSandboxLambdaEdgeFunction.Arn
+  caasSandboxVersionedLambdaEdgeFunction:
+    Description: ARN of the Lambda function
+    Value: !Ref caasSandboxVersionedLambdaEdgeFunction

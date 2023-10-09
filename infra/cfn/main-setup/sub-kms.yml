@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: v1.0.0 | Caas Frontend | sub-kms | KMS Encryption
+Parameters:
+  Environment:
+    Description: 'Enrvironment type: Dev, QA, Prod, etc'
+    Type: String
+    Default: dev
+  CostCenter:
+    Description: Cost Center
+    Type: String
+Resources:
+  caasFrontendKmsKey:
+      Type: AWS::KMS::Key
+      Properties:
+        Description: KMS Key for Encryption
+        KeyPolicy:
+          Version: 2012-10-17
+          Id: root-permission-default
+          Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join [ '', [ 'arn:aws:iam::', !Ref 'AWS::AccountId', ':root' ] ]
+            Action: 'kms:*'
+            Resource: '*'
+        Tags:
+        - Key: Cost Center
+          Value: !Ref CostCenter
+        - Key: Stack
+          Value: !Ref Environment
+        - Key: Name
+          Value: !Sub '${CostCenter}-${Environment}-KMSKey'
+  caasFrontendKMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/caasFrontendKMSKey-${Environment}'
+      TargetKeyId: !Ref caasFrontendKmsKey
+Outputs:
+  caasFrontendKmsKeyId:
+    Description: Key Id of the Encryption KMS key
+    Value: !Ref caasFrontendKmsKey
